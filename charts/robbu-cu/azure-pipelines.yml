@@ -1,0 +1,160 @@
+﻿parameters:
+  # ====== Docker/ACR ======
+  - name: acrName
+    type: string
+    default: 'meuregistrydede'
+  - name: dockerFilePath
+    type: string
+    default: '**/Dockerfile'
+  - name: dockerBuildContext
+    type: string
+    default: '$(Build.SourcesDirectory)'
+  - name: imageTag
+    type: string
+    default: '$(Build.BuildId)'
+
+  # ====== AKS ======
+  - name: aksResourceGroup
+    type: string
+    default: 'rg-aks-prod'
+  - name: aksName
+    type: string
+    default: 'aks-prod'
+  - name: k8sNamespace
+    type: string
+    default: 'demo'
+
+  # ====== Helm/Deployment ======
+  - name: releaseName
+    type: string
+    default: 'yamahacob'
+  - name: appName
+    type: string
+    default: 'robbu-cu'
+  - name: replicaCount
+    type: number
+    default: 2
+  - name: aspnetcoreEnv
+    type: string
+    default: 'Production'
+
+  # ====== Service Connection Names ======
+  - name: acrServiceConnection
+    type: string
+    default: 'azureRM'  
+  - name: azureServiceConnection
+    type: string
+    default: 'ArmConection'    
+
+  - name: branch
+    type: string
+    default: 'main'  
+    
+  - name: helmChartPath
+    type: string
+    default: 'Kubernetes/teste' 
+
+  - name: helmValuesFile
+    type: string
+    default: 'Kubernetes/teste/charts/robbu-cu/values.yaml' 
+
+  - name: registryUrl
+    type: string
+    default: 'meuregistrydede.azurecr.io' 
+
+
+trigger: none
+
+variables:
+  imageRepository: 'robbu-cu-teste'
+  imageTag: 'latest'
+
+  aspnetcoreEnv: 'Production'
+
+stages:
+- stage: Build_Push
+  displayName: Build & Push image to ACR
+  jobs:
+  - job: dockerBuildPush
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - checkout: self
+      clean: true
+
+    - task: Docker@2
+      displayName: Build and push
+      inputs:
+        command: buildAndPush
+        repository: $(imageRepository)
+        containerRegistry: ${{ parameters.acrServiceConnection }}        
+        dockerfile: ${{ parameters.dockerFilePath }}       
+        buildContext: ${{ parameters.dockerBuildContext }}
+        tags: |
+          $(imageTag)
+
+jobs:
+  - deployment: Deploy_Dev
+    environment: $(aspnetcoreEnv)
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+            - checkout: self
+            - checkout: gitops
+
+            # 🔍 Debug para confirmar o path
+            - script: ls -lR
+              displayName: "🔍 Debug"
+
+<<<<<<< HEAD
+            # Preview do template para revisão
+            - task: Bash@3
+              displayName: "🔍 Preview Kubernetes Manifest (helm template)"
+              inputs:
+                targetType: inline
+                script: |
+                  echo "Gerando o template do Helm para revisão..."
+                  helm template ${{ parameters.releaseName }} ${{ parameters.helmChartPath }} \
+                    --namespace ${{ parameters.helmNamespace }} \
+                    -f Robbu.DevOps/robbu-apps/values-global.yaml \
+                    -f ${{ parameters.helmValuesFile }} \
+                    --set image.registry=${{ parameters.registryUrl }} \
+                    --set image.name=$(imageRepository) \
+                    --set image.tag=$(imageTag)
+
+            # Deploy via task HelmDeploy (mais limpo que Bash manual)
+            - task: HelmDeploy@0
+              displayName: Deploy app
+              inputs:
+                connectionType: Azure Resource Manager
+                azureSubscription: 'Azure subscription 1'
+                azureResourceGroup: 'rg-evolution'
+                kubernetesCluster: ${{ parameters.aksName }}
+                namespace: ${{ parameters.appName }}
+                command: upgrade
+                chartType: FilePath
+                chartPath: ${{ parameters.helmChartPath }}
+                releaseName: ${{ parameters.releaseName }}
+                overrideValues: |
+                  image.registry=${{ parameters.registryUrl }}
+                  image.name=$(imageRepository)
+                  image.tag=$(imageTag)
+                valueFile: ${{ parameters.helmValuesFile }}
+                arguments: --atomic --timeout 300s --install --debug --description "$(Build.BuildNumber)"
+=======
+    - bash: |
+        set -e
+        echo "===> Deploy com Helm Chart local"
+        helm upgrade --install \
+          "${{ parameters.k8sNamespace.releaseName }}" \
+          "$(Pipeline.Workspace)/gitops/charts/robbu-cu" \
+          -f "$(Pipeline.Workspace)/gitops/charts/robbu-cu/values.yaml"
+          -n "${{ parameters.k8sNamespace }}" --create-namespace \
+          --set image.repository="${{ parameters.acrName }}/$(imageRepository)" \
+          --set image.tag="$(imageTag)" \
+          --set replicaCount="${{ parameters.replicaCount }}" \
+          --set env.ASPNETCORE_ENVIRONMENT="${{ parameters.aspnetcoreEnv }}"
+>>>>>>> 2bdd9e65fc97c3dca70a198514f8d8cdcbf998c9
+
+

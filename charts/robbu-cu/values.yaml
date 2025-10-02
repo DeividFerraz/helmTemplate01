@@ -1,0 +1,19 @@
+name: robbu-cu
+
+image:
+  repository: meuregistrydede.azurecr.io/robbu-cu-teste
+  tag: "latest"
+  pullPolicy: Always
+  pullSecretName: ""
+
+replicaCount: 2
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 80
+
+env:
+  ASPNETCORE_ENVIRONMENT: "Production"
+
+resources: {}
